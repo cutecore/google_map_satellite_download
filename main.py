@@ -1,6 +1,8 @@
 import math
 import os
 import requests
+import cv2
+import numpy as np
 
 
 def swap(a, b):
@@ -58,17 +60,33 @@ def lonlat2xyz(lon, lat, zoom):
 
 
 def core():
+    path = r"C:\Users\cutec\Desktop\map"
     point_lt = Point(119.647057, 26.950660)
-    point_rb = Point(119.6510056, 26.9422439)
-    z = 17
+    point_rb = Point(119.6550056, 26.9422439)
+    z = 18
     x1, y1 = lonlat2xyz(point_lt.lon, point_lt.lat, z)
     x2, y2 = lonlat2xyz(point_rb.lon, point_rb.lat, z)
     print(x1, y1, z)
     print(x2, y2, z)
     for i in range(x1, x2+1):
         for j in range(y1, y2+1):
-            download(i, j, z, r"C:\Users\cutec\Desktop\map")
+            download(i, j, z, path)
+            pass
+    merge(x1, y1, x2, y2, z, path)
+
+
+def merge(x1, y1, x2, y2, z, path):
+    row_list = list()
+    for i in range(x1, x2+1):
+        col_list = list()
+        for j in range(y1, y2+1):
+            col_list.append(cv2.imread(path + "\\{z}\\{i}\\{j}.png".format(i=i, j=j,z=z)))
+        k = np.vstack(col_list)
+        row_list.append(k)
+    result = np.hstack(row_list)
+    cv2.imwrite(path + "//merge.png", result)
 
 
 if __name__ == '__main__':
     core()
+
