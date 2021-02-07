@@ -59,20 +59,38 @@ def lonlat2xyz(lon, lat, zoom):
     return int(x), int(y)
 
 
+def cal_tiff_box(x1, y1, x2, y2, z):
+    LT = xyz2lonlat(x1, y1, z)
+    RB = xyz2lonlat(x2 + 1, y2 + 1, z)
+    return Point(LT[0], LT[1]), Point(RB[0], RB[1])
+
+
 def core():
     path = r"C:\Users\cutec\Desktop\map"
-    point_lt = Point(119.647057, 26.950660)
-    point_rb = Point(119.6550056, 26.9422439)
+    point_lt = Point(114.444810, 30.489335)
+    point_rb = Point(114.459038, 30.482315)
     z = 18
     x1, y1 = lonlat2xyz(point_lt.lon, point_lt.lat, z)
     x2, y2 = lonlat2xyz(point_rb.lon, point_rb.lat, z)
     print(x1, y1, z)
     print(x2, y2, z)
+    count = 0
+    all = (x2-x1+1) * (y2-y1+1)
     for i in range(x1, x2+1):
         for j in range(y1, y2+1):
             download(i, j, z, path)
+            count += 1
+            print("{m}/{n}".format(m=count, n=all))
             pass
     merge(x1, y1, x2, y2, z, path)
+    lt, rb = cal_tiff_box(x1, y1, x2, y2, z)
+    cmd = "gdal_translate -of GTiff -a_srs EPSG:4326 -a_ullr {p1_lon} " \
+          "{p1_lat} {p2_lon} {p2_lat}" \
+          " {input} {output}".format(p1_lon=lt.lon, p1_lat=lt.lat, p2_lon=rb.lon, p2_lat=rb.lat,
+                                     input=path+"//merge.png", output=path+"//output.tiff")
+
+    print(cmd)
+    os.system(cmd)
 
 
 def merge(x1, y1, x2, y2, z, path):
@@ -89,4 +107,5 @@ def merge(x1, y1, x2, y2, z, path):
 
 if __name__ == '__main__':
     core()
+
 
