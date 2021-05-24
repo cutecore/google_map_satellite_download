@@ -23,8 +23,14 @@
 
 #0.4 
 
-main.py 包含下载瓦片 合成一张瓦片 转换为geotiff
+download_title.py 
 
-download_title.py 下载散列瓦片（加入了多线程加速下载）
+只包含 下载散列瓦片（加入了多线程加速下载）
+
+main.py 
+
+包含 下载瓦片 合成一张图片 转换为geotiff
+
+
 
 
