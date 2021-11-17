@@ -92,10 +92,7 @@ def downloadPlus(x1, y1, x2, y2, z, path):
     for thread in threads:
         thread.join()
 
-def core(z):
-    path = r"C:\Users\cutec\Desktop\map"
-    point_lt = Point(116.286476, 40.069985 )
-    point_rb = Point(  116.324707 , 40.054938)
+def core(point_lt,point_rb,path,z):
     x1, y1 = lonlat2xyz(point_lt.lon, point_lt.lat, z)
     x2, y2 = lonlat2xyz(point_rb.lon, point_rb.lat, z)
     print(x1, y1, z)
@@ -104,7 +101,18 @@ def core(z):
     downloadPlus(x1, y1, x2, y2, z, path)
     
 if __name__ == '__main__':
-    for i in range(16,18):
-        core(i)
+    # 存储目录
+    path = r"D:\map"
+    # 下载范围的 左上点经纬度
+    point_lt = Point(116.286476, 40.069985)
+    # 下载范围的 右下点经纬度
+    point_rb = Point(116.324707 ,40.054938)
+    # 开始级别 
+    level_start = 16
+    # 结束级别
+    level_end = 17
+
+    for i in range(level_start,level_end+1):
+        core(point_lt,point_rb,path,i)
 
 
