@@ -1,26 +1,40 @@
 # google_map_satellite_download
 
 # 0.1 开始
-  上家公司有内部使用的地图下载工具，支持下载各种影像，离职后，一次工作中使用无偏移的谷歌影像
-，发现市场上的软件如bigemap之类收费有水印，有些不便，于是自己动手写了一个。简单实现了下面三个功能。
+工作中需要使用无偏移的谷歌影像，发现市面上的影像下载工具如bigemap需要付费，或是有水印，
+上家公司有影像下载工具，就想自己写一个。不是做GIS，对OpenCV、GDAL、Python也没有深入了解，见谅。
+  
+简单实现了下面三个功能：
 
 - 支持下载谷歌地图卫星影像散列瓦片
-- 支持下载谷歌地图卫星合并为一张png 
+- 支持下载谷歌地图卫星散列瓦片合并为一张png 
 - 支持合并后图片转换为geotiff 
-- 下载散列瓦片，使用nginx作为简易瓦片服务器
 
 # 0.2 使用
-1. 需要能访问google服务器，在代码中配置你的proxy
-2. 如果需要生成geotiff文件需要安装GDAL，[已经编译好的GDAL windows版本](https://www.gisinternals.com/release.php)
-3. 如果不需要合并或者生成geotiff可以注释掉相代码
 
-本职是后台开发，亦不是GIS专业，所以对OpenCV，GDAL，Python也没有深入了解，见谅。
+1. 如果需要tiff，只需要使用main.py，便可下载并生成tiff
+2. 如果需要散列瓦片的方式，只需要使用download_title.py, 便可在nginx + leaflet中使用。
 
-# 0.3 介绍
-main.py 包含下载瓦片,合成一张图片,转换为geotiff
+1. 下载瓦片，需要能访问google服务器，请在代码中配置你的proxy
+2. 生成geotiff文件，需要GDAL，[已经编译好的GDAL windows版本](https://www.gisinternals.com/release.php)
 
-download_title.py 只包含下载散列瓦片（加入了多线程加速下载）
+# 0.3 download_title.py 的使用
+```
+if __name__ == '__main__':
+    # 存储目录
+    path = r"D:\map"
+    # 下载范围的 左上点经纬度
+    point_lt = Point(116.286476, 40.069985)
+    # 下载范围的 右下点经纬度
+    point_rb = Point(116.324707 ,40.054938)
+    # 开始级别 
+    level_start = 16
+    # 结束级别
+    level_end = 17
 
+    for i in range(level_start,level_end+1):
+        core(point_lt,point_rb,path,i)
+```        
 
 
 
