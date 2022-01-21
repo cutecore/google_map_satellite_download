@@ -1,129 +1,118 @@
-#!/usr/bin/python
-# -*- coding: UTF-8 -*-
-
+import math
 import os
-import sys
 import requests
 import numpy as np
 import threading
 
 
-def checkdir(dir, m3u8_file, drm_key_file, output_dir, decrypt_dir):
-    if not os.path.exists(dir):
-        print('error: 目录不存在')
-        sys.exit(-1)
-    if not os.path.exists(m3u8_file):
-        print('error: m3u8文件不存在')
-        sys.exit(-1)
-    if not os.path.exists(drm_key_file):
-        print('error: drm_key文件不存在')
-        sys.exit(-1)
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-    if not os.path.exists(decrypt_dir):
-        os.mkdir(decrypt_dir)
+def swap(a, b):
+    a, b = b, a
+    return a, b
 
 
-def getDrmKey(drm_key_file):
-    with open(drm_key_file, "br") as f:
-        drm_key = f.readline().hex().upper()
-        return drm_key
+class Point:
+    def __init__(self, lon, lat):
+        self.lon = lon
+        self.lat = lat
 
 
-def getFileCout(m3u8_file):
-    with open(m3u8_file, "r") as f:
-        count_line = f.readlines()
-        count_line = count_line[-2]
-        count = int(count_line.split("_")[2].split(".")[0]) + 1
-        return count
+class Box:
+    def __init__(self, point_lt, point_rb):
+        self.point_lt = point_lt
+        self.point_rb = point_rb
 
 
-def buildUrl(url_base, count):
-    urls = []
-    for i in range(0, count):
-        # https://stc001.dmm.com/digital/st1:jH2T1hW80bMyCLTEoc1W1RbWddenfRArSTGD9WGsgJMlnfWuS0z8QeHwwYymKXcvcuXjJ3CwD81tjGLK6wPAbkqyBqP5NioTGf8yzpwnXII=/k22OwYLUa6Bua06d7GsUV4-0effd5ea5d3bcb3bb17781646b717b7d1642747279/-/media_b2000000_656.ts
-        url = url_base + "media_b6000000_{x}.ts".format(x=i)
-        urls.append(url)
-    return urls
+def build_url(x, y, z):
+    return "http://khms0.google.com/kh/v=893?&x={x}&y={y}&z={z}".format(x=x, y=y, z=z)
 
 
-def download(file_name, url):
+def download(x, y, z, path):
+    print('[Download]:',x,y,z,path)
     proxies = {
         "http": "http://127.0.0.1:10809",
         "https": "http://127.0.0.1:10809"
     }
+    url = build_url(x, y, z)
     response = requests.get(url, proxies=proxies)
-    with open(file_name, "wb") as code:
-        code.write(response.content)
-
-
-def toMp4(concat_file_list, ts_decrypt_dir, output_dir):
-    with open(concat_file_list, "w+") as f:
-        for i in range(0, count):
-            file = ts_decrypt_dir + "media_b6000000_{x}.ts".format(x=i)
-            line = "file '{file}'\n".format(file=file)
-            f.write(line)
-    output_file = output_dir + "output.mp4"
-    ffmpeg_cmd = "ffmpeg -f concat -safe 0 -i {concat_file_list} -c copy {output_file}".\
-        format(concat_file_list=concat_file_list, output_file=output_file)
-    os.system(ffmpeg_cmd)
-
-
-def temp():
-    
-
-
+    path = path + "\\{z}\\{x}\\".format(z=z, x=x)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    filepath = path + "\\{y}.png".format(y=y)
+    if response.status_code == 200:
+        with open(filepath, "wb") as f:
+            f.write(response.content)
+    else:
+        print("network error!")
 
 class myThread (threading.Thread):
-    def __init__(self, array,output_dir):
+    def __init__(self, array):
         threading.Thread.__init__(self)
         self.array = array
-
+       
     def run(self):
-        for url in self.array:
-            filename = output_dir + url.split('-')[2]
-            download(filename,url)
+        for i in self.array:
+            download(i[0],i[1],i[2],i[3])
 
 
+def xyz2lonlat(x, y, z):
+    n = math.pow(2, z)
+    lon = x / n * 360.0 - 180.0
+    lat = math.atan(math.sinh(math.pi * (1 - 2 * y / n)))
+    lat = lat * 180.0 / math.pi
+    return lon, lat
+
+
+def lonlat2xyz(lon, lat, zoom):
+    n = math.pow(2, zoom)
+    x = ((lon + 180) / 360) * n
+    y = (1 - (math.log(math.tan(math.radians(lat)) + (1 / math.cos(math.radians(lat)))) / math.pi)) / 2 * n
+    return int(x), int(y)
+
+
+def cal_tiff_box(x1, y1, x2, y2, z):
+    LT = xyz2lonlat(x1, y1, z)
+    RB = xyz2lonlat(x2 + 1, y2 + 1, z)
+    return Point(LT[0], LT[1]), Point(RB[0], RB[1])
+
+def downloadPlus(x1, y1, x2, y2, z, path):
+    urlArray = [] 
+    for i in range(x1, x2+1):
+        for j in range(y1, y2+1):
+            urlArray.append([i, j, z, path])
+  
+    urlArraySplit = np.array_split(np.array(urlArray),16)
+    
+    threads = []
+
+    for item in urlArraySplit:
+        thread = myThread(item)
+        thread.start()
+        threads.append(thread)
+    
+    for thread in threads:
+        thread.join()
+
+def core(point_lt,point_rb,path,z):
+    x1, y1 = lonlat2xyz(point_lt.lon, point_lt.lat, z)
+    x2, y2 = lonlat2xyz(point_rb.lon, point_rb.lat, z)
+    print(x1, y1, z)
+    print(x2, y2, z)
+    print((x2-x1+1) * (y2-y1+1))
+    downloadPlus(x1, y1, x2, y2, z, path)
+    
 if __name__ == '__main__':
-    if(2 != len(sys.argv)):
-        print('python save.py dir')
-        sys.exit(-1)
-    else:
-        dir = sys.argv[1]
-        m3u8_file = dir + "/chunklist_b6000000.m3u8"
-        drm_key_file = dir + "/drm_iphone"
-        decrypt_dir = dir + '/decrypt'
-        output_dir = dir + '/output'
+    # 存储目录
+    path = r"D:\map"
+    # 下载范围的 左上点经纬度
+    point_lt = Point(116.286476, 40.069985)
+    # 下载范围的 右下点经纬度
+    point_rb = Point(116.324707 ,40.054938)
+    # 开始级别 
+    level_start = 16
+    # 结束级别
+    level_end = 17
 
-        checkdir(dir, m3u8_file, drm_key_file, output_dir, decrypt_dir)
-        key = getDrmKey(drm_key_file)
-        print(key)
-        count = getFileCout(m3u8_file)
-        print(count)
-        url_base = 'https://stc001.dmm.com/digital/st1:jH2T1hW80bMyCLTEoc1W1RbWddenfRArSTGD9WGsgJMlnfWuS0z8QeHwwYymKXcvcuXjJ3CwD81tjGLK6wPAbkqyBqP5NioTGf8yzpwnXII=/k22OwYLUa6Bua06d7GsUV4-0effd5ea5d3bcb3bb17781646b717b7d1642747279/-/'
-        urls = buildUrl(url_base, count)
-        # print(urls)
-        # urlArraySplit = np.array_split(np.array(urls), 16)
-        # threads = []
-        # for item in urlArraySplit:
-        #     thread = myThread(item,output_dir)
-        #     thread.start()
-        #     threads.append(thread)
+    for i in range(level_start,level_end+1):
+        core(point_lt,point_rb,path,i)
 
-        # for thread in threads:
-        #     thread.join()
-
-        for i in range(0, count):
-            file_name = dir + "/media_b6000000_{x}.ts".format(x=i)
-            url = url_base + "media_b6000000_{x}.ts".format(x=i)
-            download(file_name, url)
-
-            file_input = file_name
-            file_output = output_dir + "/" + "media_b6000000_{x}.ts".format(x=i)
-            iv = "%032x" % i
-            openssl_cmd = r'D:\OpenSSL-Win64\bin\openssl.exe aes-128-cbc -d -in {file_input} -out {file_output} -K {k} -iv {iv} -nosalt'.\
-                format(file_input=file_input, file_output=file_output, iv=iv, k=key)
-            print(openssl_cmd)
-            os.system(openssl_cmd)
 
