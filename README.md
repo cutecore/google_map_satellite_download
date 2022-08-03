@@ -15,13 +15,16 @@
 
 # 0.2 下载tiff,使用 download_tiff.py
 
-使用download_tiff，便可下载并生成tiff
+只需使用download_tiff，便可下载并生成tiff
 生成geotiff文件，需要GDAL，[已经编译好的GDAL windows版本](https://www.gisinternals.com/release.php)
+
+ ![image](/readme/v2.png)
 
 # 0.3 下载瓦片,使用 download_tile.py
 
-下载散列瓦片，只需使用download_title.py, 
-便可在nginx + leaflet中使用。
+下载散列瓦片，只需使用download_title.py, 便可在nginx + leaflet中使用。
+
+ ![image](/readme/v1.png)
 
 # 0.4
 ```
