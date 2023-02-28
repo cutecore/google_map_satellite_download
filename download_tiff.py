@@ -28,20 +28,27 @@ def build_url(x, y, z):
 
 def download(x, y, z, path):
     proxies = {
-        "http": "http://127.0.0.1:10809",
-        "https": "http://127.0.0.1:10809"
+        "http": "http://127.0.0.1:50084",
+        "https": "http://127.0.0.1:50084"
     }
     url = build_url(x, y, z)
-    response = requests.get(url, proxies=proxies)
+    
     path = path + "\\{z}\\{x}\\".format(z=z, x=x)
     if not os.path.exists(path):
         os.makedirs(path)
     filepath = path + "\\{y}.png".format(y=y)
-    if response.status_code == 200:
-        with open(filepath, "wb") as f:
-            f.write(response.content)
+    if os.path.exists(filepath) and os.path.getsize(filepath) > 400:
+        print("skip")
+        pass
     else:
-        print("network error!")
+        for x in range(0,3):
+            response = requests.get(url, proxies=proxies)
+            if response.status_code == 200:
+                with open(filepath, "wb") as f:
+                    f.write(response.content)
+                break;
+            else:
+                print("network error!")
 
 
 def xyz2lonlat(x, y, z):
@@ -65,11 +72,10 @@ def cal_tiff_box(x1, y1, x2, y2, z):
     return Point(LT[0], LT[1]), Point(RB[0], RB[1])
 
 
-def core():
+def core(z):
     path = r"C:\Users\cutec\Desktop\map"
     point_lt = Point(114.444810, 30.489335)
     point_rb = Point(114.459038, 30.482315)
-    z = 18
     x1, y1 = lonlat2xyz(point_lt.lon, point_lt.lat, z)
     x2, y2 = lonlat2xyz(point_rb.lon, point_rb.lat, z)
     print(x1, y1, z)
@@ -84,14 +90,13 @@ def core():
             pass
     merge(x1, y1, x2, y2, z, path)
     lt, rb = cal_tiff_box(x1, y1, x2, y2, z)
-    cmd = "gdal_translate -of GTiff -a_srs EPSG:4326 -a_ullr {p1_lon} " \
+    cmd = "gdal_translate.exe -of GTiff -a_srs EPSG:4326 -a_ullr {p1_lon} " \
           "{p1_lat} {p2_lon} {p2_lat}" \
           " {input} {output}".format(p1_lon=lt.lon, p1_lat=lt.lat, p2_lon=rb.lon, p2_lat=rb.lat,
-                                     input=path+"//merge.png", output=path+"//output.tiff")
+                                     input='/'.join(path.split('\\'))+"/merge.png", output='/'.join(path.split('\\'))+"/output.tiff")
 
-    print(cmd)
-    os.system(cmd)
-
+    print('配置环境变量 然后运行 即可生成 tiff ' + cmd)
+   
 
 def merge(x1, y1, x2, y2, z, path):
     row_list = list()
@@ -106,6 +111,6 @@ def merge(x1, y1, x2, y2, z, path):
 
 
 if __name__ == '__main__':
-    core()
+    core(z = 19) #调整下载级别 
 
 
