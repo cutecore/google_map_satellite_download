@@ -3,6 +3,7 @@ import os
 import requests
 import cv2
 import numpy as np
+import threading
 
 
 def swap(a, b):
@@ -23,32 +24,40 @@ class Box:
 
 
 def build_url(x, y, z):
-    return "http://khms0.google.com/kh/v=893?&x={x}&y={y}&z={z}".format(x=x, y=y, z=z)
+    return "https://khms0.google.com/kh/v=979?&x={x}&y={y}&z={z}".format(x=x, y=y, z=z)
 
 
 def download(x, y, z, path):
-    proxies = {
-        "http": "http://127.0.0.1:50084",
-        "https": "http://127.0.0.1:50084"
-    }
     url = build_url(x, y, z)
-    
-    path = path + "\\{z}\\{x}\\".format(z=z, x=x)
+
+    # path = path + "\\{z}\\{x}\\".format(z=z, x=x)
+    path = os.path.join(path, f"{z}", f"{x}")
     if not os.path.exists(path):
-        os.makedirs(path)
-    filepath = path + "\\{y}.png".format(y=y)
+        os.makedirs(path, exist_ok=True)
+    # filepath = path + "\\{y}.png".format(y=y)
+    filepath = os.path.join(path, f"{y}.png")
     if os.path.exists(filepath) and os.path.getsize(filepath) > 400:
         print("skip")
-        pass
     else:
-        for x in range(0,3):
-            response = requests.get(url, proxies=proxies)
+        proxies = {"http": "http://127.0.0.1:30009", "https": "http://127.0.0.1:30009"}
+        for _ in range(3):
+            response = requests.get(
+                url,
+                proxies=proxies,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+                    "Referer": "https://www.google.com/maps/@39.9042,116.4074,12z",
+                    "Accept-Language": "zh-CN,zh;q=0.9",
+                    "Accept-Encoding": "gzip, deflate, br",
+                },
+            )
             if response.status_code == 200:
                 with open(filepath, "wb") as f:
                     f.write(response.content)
-                break;
+                break
             else:
                 print("network error!")
+                print(response.text)
 
 
 def xyz2lonlat(x, y, z):
@@ -62,7 +71,19 @@ def xyz2lonlat(x, y, z):
 def lonlat2xyz(lon, lat, zoom):
     n = math.pow(2, zoom)
     x = ((lon + 180) / 360) * n
-    y = (1 - (math.log(math.tan(math.radians(lat)) + (1 / math.cos(math.radians(lat)))) / math.pi)) / 2 * n
+    y = (
+        (
+            1
+            - (
+                math.log(
+                    math.tan(math.radians(lat)) + (1 / math.cos(math.radians(lat)))
+                )
+                / math.pi
+            )
+        )
+        / 2
+        * n
+    )
     return int(x), int(y)
 
 
@@ -73,44 +94,56 @@ def cal_tiff_box(x1, y1, x2, y2, z):
 
 
 def core(z):
-    path = r"C:\Users\cutec\Desktop\map"
-    point_lt = Point(114.444810, 30.489335)
-    point_rb = Point(114.459038, 30.482315)
+    path = r"."
+    point_lt = Point(-180, 70)
+    point_rb = Point(170, -60)
     x1, y1 = lonlat2xyz(point_lt.lon, point_lt.lat, z)
     x2, y2 = lonlat2xyz(point_rb.lon, point_rb.lat, z)
     print(x1, y1, z)
     print(x2, y2, z)
     count = 0
-    all = (x2-x1+1) * (y2-y1+1)
-    for i in range(x1, x2+1):
-        for j in range(y1, y2+1):
-            download(i, j, z, path)
-            count += 1
-            print("{m}/{n}".format(m=count, n=all))
-            pass
+    all = (x2 - x1 + 1) * (y2 - y1 + 1)
+    threads = []
+    for i in range(x1, x2 + 1):
+        for j in range(y1, y2 + 1):
+            t = threading.Thread(target=download, args=(i, j, z, path))
+            t.start()
+            threads.append(t)
+            # download(i, j, z, path)
+            # count += 1
+            # print("{m}/{n}".format(m=count, n=all))
+    for t in threads:
+        t.join()
     merge(x1, y1, x2, y2, z, path)
     lt, rb = cal_tiff_box(x1, y1, x2, y2, z)
-    cmd = "gdal_translate.exe -of GTiff -a_srs EPSG:4326 -a_ullr {p1_lon} " \
-          "{p1_lat} {p2_lon} {p2_lat}" \
-          " {input} {output}".format(p1_lon=lt.lon, p1_lat=lt.lat, p2_lon=rb.lon, p2_lat=rb.lat,
-                                     input='/'.join(path.split('\\'))+"/merge.png", output='/'.join(path.split('\\'))+"/output.tiff")
+    cmd = (
+        "gdal_translate.exe -of GTiff -a_srs EPSG:4326 -a_ullr {p1_lon} "
+        "{p1_lat} {p2_lon} {p2_lat}"
+        " {input} {output}".format(
+            p1_lon=lt.lon,
+            p1_lat=lt.lat,
+            p2_lon=rb.lon,
+            p2_lat=rb.lat,
+            input="/".join(path.split("\\")) + "/merge.png",
+            output="/".join(path.split("\\")) + "/output.tiff",
+        )
+    )
 
-    print('配置环境变量 然后运行 即可生成 tiff ' + cmd)
-   
+    print(f"配置环境变量 然后运行 即可生成 tiff {cmd}")
+
 
 def merge(x1, y1, x2, y2, z, path):
-    row_list = list()
-    for i in range(x1, x2+1):
-        col_list = list()
-        for j in range(y1, y2+1):
-            col_list.append(cv2.imread(path + "\\{z}\\{i}\\{j}.png".format(i=i, j=j,z=z)))
+    row_list = []
+    for i in range(x1, x2 + 1):
+        col_list = [
+            cv2.imread(path + "\\{z}\\{i}\\{j}.png".format(i=i, j=j, z=z))
+            for j in range(y1, y2 + 1)
+        ]
         k = np.vstack(col_list)
         row_list.append(k)
     result = np.hstack(row_list)
-    cv2.imwrite(path + "//merge.png", result)
+    cv2.imwrite(f"{path}//merge.png", result)
 
 
-if __name__ == '__main__':
-    core(z = 19) #调整下载级别 
-
-
+if __name__ == "__main__":
+    core(z=4)  # 调整下载级别
